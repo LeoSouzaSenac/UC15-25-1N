@@ -1,7 +1,7 @@
 # Navegação no React Native
 
 > **Tecnologias:** Expo SDK 58 · React Native 0.88 · React 19.3 · TypeScript · React Navigation 7  
-> **Objetivo:** criar aplicativos com várias telas, transmitir dados entre elas e combinar **Bottom Tabs + Native Stack**.  
+> **Objetivo:** criar aplicativos com várias telas, transmitir dados entre elas e combinar **Bottom Tabs + Native Stack + Drawer**.  
 > **Pré-requisitos:** componentes, props, `useState`, objetos, TypeScript e organização de arquivos com `import`/`export`.
 
 ## O que vamos aprender?
@@ -13,7 +13,7 @@ Ao final desta aula, você deverá conseguir:
 3. Criar telas em **arquivos separados**, sem usar `any`.
 4. Abrir telas, voltar e enviar parâmetros tipados.
 5. Criar abas inferiores com ícones.
-6. **Combinar Stack e Bottom Tabs em um mesmo aplicativo**, com uma tela de detalhes aberta dentro de uma aba.
+6. **Combinar Stack, Bottom Tabs e Drawer no mesmo aplicativo**, com detalhes de produtos e menu lateral.
 
 ---
 
@@ -27,6 +27,7 @@ São duas situações diferentes:
 |---|---|---|
 | **Native Stack** | Coloca uma tela sobre outra, como cartas empilhadas | Lista de produtos → Detalhes do produto → Voltar |
 | **Bottom Tabs** | Permite trocar entre áreas do app tocando nas abas inferiores | Início ↔ Favoritos ↔ Configurações |
+| **Drawer** | Exibe um menu lateral para acessar áreas do app | Menu ☰ → Loja, Favoritos, Configurações |
 
 **Uma analogia:** o Stack funciona como uma pilha de folhas na mesa. As Tabs funcionam como divisórias de um fichário.
 
@@ -43,13 +44,13 @@ Esta aula pressupõe um projeto que usa **`App.tsx` como ponto de entrada**, em 
 No terminal, **dentro da pasta do projeto**:
 
 ```bash
-npm install @react-navigation/native @react-navigation/native-stack @react-navigation/bottom-tabs
+npm install @react-navigation/native @react-navigation/native-stack @react-navigation/bottom-tabs @react-navigation/drawer
 ```
 
 As dependências nativas devem ser instaladas com o Expo, para resolver versões compatíveis com a SDK:
 
 ```bash
-npx expo install react-native-screens react-native-safe-area-context
+npx expo install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated react-native-worklets
 ```
 
 Para os ícones das abas:
@@ -311,7 +312,7 @@ ExemploTabs/
     └── navigation.ts
 ```
 
-> **Atenção:** os exemplos das partes A, B e C são projetos independentes. Não copie três versões de `App.tsx` para o mesmo projeto. Na **Parte C**, criaremos o aplicativo final usando os dois navegadores juntos.
+> **Atenção:** os exemplos das partes A, B e C são projetos independentes. Não copie três versões de `App.tsx` para o mesmo projeto. Na **Parte C**, criaremos o aplicativo final usando os três navegadores juntos.
 
 ### 8.1. Tipos das abas
 
@@ -428,7 +429,7 @@ Crie uma terceira aba chamada **Configurações**. Ela deve ter um ícone de eng
 
 ## 9. O aplicativo que vamos construir
 
-Agora vamos fazer um **único aplicativo** em que os dois tipos de navegação trabalham juntos.
+Agora vamos fazer um **único aplicativo** em que os três tipos de navegação trabalham juntos. O Drawer envolverá as abas, sem modificar a lógica dos produtos.
 
 Imagine uma pequena loja:
 
@@ -437,21 +438,26 @@ Imagine uma pequena loja:
 - Ao tocar em um produto, abre a tela de **Detalhes do Produto** usando um **Native Stack**.
 - Ao voltar, o usuário retorna para a lista de produtos.
 - **As abas continuam visíveis mesmo na tela de detalhes**, porque o Stack está **dentro da aba Início**.
+- Um **menu lateral (Drawer)** permite acessar Loja, Favoritos e Configurações; reutilizaremos as telas que já existem.
 
 ### 9.1. Como os navegadores estarão organizados
 
 ```text
 NavigationContainer
-└── Bottom Tab Navigator
-    ├── Início [aba]
-    │   └── Native Stack Navigator
-    │       ├── Lista de Produtos  ← primeira tela da pilha
-    │       └── Detalhes do Produto ← abre por cima da lista
-    ├── Favoritos [aba]
-    └── Configurações [aba]
+└── Drawer Navigator [menu lateral]
+    ├── Loja
+    │   └── Bottom Tab Navigator
+    │       ├── Início [aba]
+    │       │   └── Native Stack Navigator
+    │       │       ├── Lista de Produtos
+    │       │       └── Detalhes do Produto
+    │       ├── Favoritos [aba]
+    │       └── Configurações [aba]
+    ├── Favoritos [menu lateral]
+    └── Configurações [menu lateral]
 ```
 
-**Essa é a ideia mais importante da aula:** as Tabs alternam entre áreas; dentro da aba Início, o Stack permite avançar e voltar entre telas.
+**Essa é a ideia mais importante da aula:** o Drawer abre o menu lateral, as Tabs alternam entre áreas e o Stack permite avançar e voltar entre telas.
 
 > Outra arquitetura possível seria colocar o **Bottom Tabs dentro de um Stack principal**. Nesse caso, uma tela de detalhes aberta no Stack principal pode cobrir as abas. Não existe uma única organização obrigatória: escolhemos conforme a experiência desejada.
 
@@ -466,7 +472,8 @@ MinhaLoja/
 │   └── produtos.ts
 ├── navigation/
 │   ├── InicioStack.tsx
-│   └── AppTabs.tsx
+│   ├── AppTabs.tsx
+│   └── AppDrawer.tsx
 ├── screens/
 │   ├── ProdutosScreen.tsx
 │   ├── DetalhesScreen.tsx
@@ -490,6 +497,12 @@ export type InicioStackParamList = {
 
 export type AppTabParamList = {
   Inicio: NavigatorScreenParams<InicioStackParamList>;
+  Favoritos: undefined;
+  Configuracoes: undefined;
+};
+
+export type AppDrawerParamList = {
+  Loja: NavigatorScreenParams<AppTabParamList>;
   Favoritos: undefined;
   Configuracoes: undefined;
 };
@@ -666,6 +679,7 @@ O que acontece quando abrimos os detalhes?
 
 ```tsx
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { DrawerToggleButton } from '@react-navigation/drawer';
 
 import ProdutosScreen from '../screens/ProdutosScreen';
 import DetalhesScreen from '../screens/DetalhesScreen';
@@ -679,7 +693,10 @@ export default function InicioStack() {
       <Stack.Screen
         name="Produtos"
         component={ProdutosScreen}
-        options={{ title: 'Minha Loja' }}
+        options={{
+          title: 'Minha Loja',
+          headerLeft: () => <DrawerToggleButton tintColor="#1454BD" />,
+        }}
       />
       <Stack.Screen
         name="Detalhes"
@@ -753,6 +770,7 @@ const styles = StyleSheet.create({
 
 ```tsx
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { DrawerToggleButton } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 
 import InicioStack from './InicioStack';
@@ -782,6 +800,7 @@ export default function AppTabs() {
         component={FavoritosScreen}
         options={{
           title: 'Favoritos',
+          headerLeft: () => <DrawerToggleButton tintColor="#1454BD" />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart-outline" color={color} size={size} />
           ),
@@ -793,6 +812,7 @@ export default function AppTabs() {
         component={ConfiguracoesScreen}
         options={{
           title: 'Configurações',
+          headerLeft: () => <DrawerToggleButton tintColor="#1454BD" />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
           ),
@@ -814,7 +834,86 @@ Na aba Início, **não** registramos diretamente `ProdutosScreen`. Registramos `
 
 E por que usamos `headerShown: false` na aba Início? Porque o **Stack interno** já desenha seu próprio cabeçalho. Assim evitamos dois cabeçalhos sobrepostos.
 
-### 10.9. App.tsx final — unindo tudo
+### 10.9. Acrescentando o Drawer — menu lateral
+
+O **Drawer** é um menu que surge pela lateral da tela. Normalmente podemos abri-lo arrastando a borda da tela ou tocando no ícone **☰** (*hambúrguer*). Ele é útil para organizar opções de navegação sem ocupar a barra inferior.
+
+**Não precisamos criar novas telas.** O menu lateral reutiliza `AppTabs`, `FavoritosScreen` e `ConfiguracoesScreen`, que já existem. Por isso, as mesmas áreas poderão ser abertas tanto pelas abas quanto pelo menu.
+
+**Arquivo novo: `navigation/AppDrawer.tsx`**
+
+```tsx
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import { Ionicons } from '@expo/vector-icons';
+
+import AppTabs from './AppTabs';
+import FavoritosScreen from '../screens/FavoritosScreen';
+import ConfiguracoesScreen from '../screens/ConfiguracoesScreen';
+import type { AppDrawerParamList } from '../types/navigation';
+
+const Drawer = createDrawerNavigator<AppDrawerParamList>();
+
+export default function AppDrawer() {
+  return (
+    <Drawer.Navigator
+      initialRouteName="Loja"
+      screenOptions={{ headerShown: false }}
+    >
+      <Drawer.Screen
+        name="Loja"
+        component={AppTabs}
+        options={{
+          title: 'Minha Loja',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="storefront-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="Favoritos"
+        component={FavoritosScreen}
+        options={{
+          title: 'Favoritos',
+          headerShown: true,
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="heart-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="Configuracoes"
+        component={ConfiguracoesScreen}
+        options={{
+          title: 'Configurações',
+          headerShown: true,
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
+          ),
+        }}
+      />
+    </Drawer.Navigator>
+  );
+}
+```
+
+**Entendendo o código:**
+
+- `createDrawerNavigator()` cria o navegador lateral.
+- `Drawer.Screen` adiciona uma opção ao menu.
+- `Loja` aponta para `AppTabs`, que **continua contendo Stack e Bottom Tabs**.
+- `Favoritos` e `Configuracoes` reutilizam os componentes já existentes.
+- `headerShown: false` na Loja evita um cabeçalho extra por cima dos cabeçalhos das abas e do Stack.
+
+**E onde aparece o botão ☰?** Fizemos apenas duas pequenas alterações nos arquivos anteriores:
+
+1. No `InicioStack.tsx`, importamos `DrawerToggleButton` e o colocamos em `headerLeft` da tela `Produtos`.
+2. No `AppTabs.tsx`, colocamos `DrawerToggleButton` em `headerLeft` das abas `Favoritos` e `Configuracoes`.
+
+`DrawerToggleButton` abre ou fecha o menu lateral, mesmo quando usado dentro dos navegadores aninhados. Na tela de detalhes, preservamos a seta **Voltar** do Stack; o Drawer continua acessível por gesto lateral.
+
+> **Observação:** `Favoritos` aberto pelo menu é uma rota diferente de `Favoritos` aberto pela barra inferior. Ambos exibem o mesmo componente, mas podem ter estados de navegação independentes. Isso é intencional neste exemplo didático.
+
+### 10.10. App.tsx final — unindo tudo
 
 **Arquivo: `App.tsx`**
 
@@ -822,27 +921,31 @@ E por que usamos `headerShown: false` na aba Início? Porque o **Stack interno**
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import AppTabs from './navigation/AppTabs';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AppDrawer from './navigation/AppDrawer';
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <AppTabs />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <AppDrawer />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 ```
 
-**Só isso!** A configuração completa foi organizada em arquivos pequenos:
+**Só isso!** A configuração completa continua organizada em arquivos pequenos:
 
-- `App.tsx` cria o container da navegação.
+- `App.tsx` cria o container da navegação e a raiz dos gestos.
+- `AppDrawer.tsx` cria o menu lateral, envolvendo as abas.
 - `AppTabs.tsx` cria a barra inferior.
 - `InicioStack.tsx` cria a pilha **dentro** da aba Início.
 - `ProdutosScreen.tsx` e `DetalhesScreen.tsx` cuidam das telas da pilha.
 
-Esse é o **exemplo completo com Bottom Tabs e Stack funcionando juntos**, sem `any` e sem colocar tudo no mesmo arquivo.
+Esse é o **exemplo completo com Drawer, Bottom Tabs e Stack funcionando juntos**, sem `any` e sem colocar tudo no mesmo arquivo.
 
 ## 11. Testando o aplicativo completo
 
@@ -862,6 +965,9 @@ Teste nesta ordem:
 6. Toque na aba **Favoritos**.
 7. Toque na aba **Configurações** e altere o Switch.
 8. Retorne à aba **Início**.
+9. Toque no botão **☰** e abra o menu lateral.
+10. Abra **Favoritos** e **Configurações** pelo menu.
+11. Retorne a **Minha Loja** pelo menu e confira que as abas continuam funcionando.
 
 Se tudo isso funcionar, você configurou corretamente a navegação aninhada.
 
@@ -941,57 +1047,3 @@ O Tab e o Stack aninhado estão desenhando cabeçalhos ao mesmo tempo. Em `AppTa
 
 ---
 
-## 14. Atividade final — Sua própria loja
-
-A partir do exemplo da **Parte C**, personalize o aplicativo:
-
-**Obrigatório**
-
-- [ ] Manter **Bottom Tabs + Stack** funcionando no mesmo aplicativo.
-- [ ] Criar pelo menos **cinco produtos** no arquivo `data/produtos.ts`.
-- [ ] Exibir os produtos com `FlatList`.
-- [ ] Navegar da lista para a tela de detalhes, enviando o `produtoId`.
-- [ ] Mostrar nome, preço e descrição do produto escolhido.
-- [ ] Manter as três abas: **Início, Favoritos e Configurações**.
-- [ ] Utilizar **TypeScript sem `any`**.
-- [ ] Manter **cada tela em um arquivo separado**.
-
-**Desafios extras**
-
-- [ ] Criar uma aba **Sobre** com informações do aplicativo.
-- [ ] Acrescentar uma propriedade `categoria` aos produtos e exibi-la nos detalhes.
-- [ ] Adicionar um botão na tela de detalhes que mostre um `Alert.alert` com o nome do produto.
-- [ ] Alterar o título do cabeçalho da tela de detalhes conforme o produto selecionado.
-
-### Perguntas para responder
-
-1. Qual é a diferença entre Stack e Bottom Tabs?
-2. Por que a tela `DetalhesScreen` não precisa ser repetida para cada produto?
-3. O que significa `route.params`?
-4. Para que serve `NavigatorScreenParams`?
-5. Por que as abas continuam visíveis enquanto olhamos os detalhes do produto?
-6. Se quiséssemos esconder as abas na tela de detalhes, o que mudaríamos na organização dos navegadores?
-
----
-
-## 15. Resumo
-
-Hoje aprendemos a criar aplicativos com múltiplas telas usando **React Navigation**:
-
-- **Stack**: abre telas sobre outras, oferecendo retorno à tela anterior.
-- **Tabs**: permite alternar entre áreas principais do aplicativo.
-- **`route.params`**: recebe informações enviadas durante a navegação.
-- **TypeScript**: verifica nomes de rotas e parâmetros antes da execução.
-- **Navegação aninhada**: permite colocar um Stack dentro de uma aba e construir experiências mais completas.
-
-**O conceito central:** não precisamos escolher entre Stack **ou** Tabs. Em aplicativos reais, frequentemente utilizamos **os dois juntos**.
-
-## Referências oficiais
-
-- [Expo SDK 58 — anúncio da versão](https://expo.dev/changelog/sdk-58)
-- [Versões do Expo SDK](https://docs.expo.dev/versions/v58.0.0/)
-- [React Navigation — primeiros passos](https://reactnavigation.org/docs/getting-started/)
-- [React Navigation — TypeScript](https://reactnavigation.org/docs/typescript/)
-- [React Navigation — navegadores aninhados](https://reactnavigation.org/docs/nesting-navigators/)
-- [React Navigation — Native Stack](https://reactnavigation.org/docs/native-stack-navigator/)
-- [React Navigation — Bottom Tabs](https://reactnavigation.org/docs/bottom-tab-navigator/)

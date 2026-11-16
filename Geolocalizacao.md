@@ -1,11 +1,4 @@
-# **RN**
-
 # UC15 · Interface Gráfica Mobile
-
-**Técnico em Desenvolvimento de Sistemas**  
-React Native · Expo SDK 58 · TypeScript · Android/iOS/Web
-
----
 
 **Bloco 2 · Aula 11**
 
